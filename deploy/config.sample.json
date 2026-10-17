@@ -2,7 +2,7 @@
   "ollama_base_url": "http://192.168.111.62:11434",
   "ollama_chat_model": "gemma4:26b",
   "fast_model": "gemma4:26b",
-  "voice_collect_seconds": 1.5,
+  "voice_collect_seconds": 1.0,
   "whisper_model": "medium",
   "whisper_device": "cuda",
   "whisper_compute_type": "int8",
@@ -14,6 +14,8 @@
   "tts_piper_length_scale": 1.0,
   "tts_piper_noise_scale": 0.667,
   "tts_piper_noise_w": 0.8,
+  "endpoint_silence_ms": 600,
+  "tool_carryover_max_turns": 0,
   "mcps": {
     "home_assistant": {
       "command": "mcp-proxy",

@@ -60,6 +60,27 @@ def is_wake_word_detected(text_lower: str, wake_word: str, aliases: List[str], f
     return False
 
 
+def _words(text: str) -> List[str]:
+    return "".join(char if _is_word_character(char) else " "
+                   for char in unicodedata.normalize("NFC", text).casefold()).split()
+
+
+def starts_with_wake_word(text_lower: str, wake_word: str, aliases: List[str], fuzzy_ratio: float = 0.78) -> bool:
+    """True when the utterance opens with the assistant's name (or an alias).
+
+    Opening with the name is direct address, so the listener can skip the
+    intent judge. Names later in the sentence ("I asked Jarvis...") are not
+    leading and still need the judge.
+    """
+    words = _words(text_lower or "")
+    if not words:
+        return False
+    if is_wake_word_detected(words[0], wake_word, aliases, fuzzy_ratio):
+        return True
+    multi_word = {" ".join(_words(alias)) for alias in aliases if len(_words(alias)) > 1}
+    return any(" ".join(words[:len(alias.split())]) == alias for alias in multi_word)
+
+
 def _normalise_control_text(value: str) -> str:
     """Keep composed word content while separating Unicode punctuation."""
     value = unicodedata.normalize("NFC", value).casefold()

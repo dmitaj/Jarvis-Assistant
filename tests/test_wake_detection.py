@@ -54,3 +54,30 @@ class TestStopCommand:
     def test_fuzzy_stop_command(self):
         """Short input fuzzy-matches stop commands."""
         assert is_stop_command("stob", ["stop", "quiet"], fuzzy_ratio=0.7) is True
+
+
+class TestStartsWithWakeWord:
+    """A request that opens with the assistant's name is direct address."""
+
+    @pytest.mark.parametrize("text", [
+        "jarvis, is the front door light on?",
+        "Jarvis what time is it",
+        "...jarvis, lights off",
+        "jarvus, what's the weather",       # fuzzy primary name
+        "joris, turn on the porch light",    # configured alias
+        "jar is the kettle on",              # two-word alias
+    ])
+    def test_leading_name_is_detected(self, text):
+        from jarvis.listening.wake_detection import starts_with_wake_word
+        assert starts_with_wake_word(text.lower(), "jarvis", ["joris", "jar is"], 0.78)
+
+    @pytest.mark.parametrize("text", [
+        "i asked jarvis about it yesterday",
+        "hey jarvis what time is it",
+        "tell jarvis to be quiet",
+        "",
+        "   ",
+    ])
+    def test_name_elsewhere_is_not_leading(self, text):
+        from jarvis.listening.wake_detection import starts_with_wake_word
+        assert not starts_with_wake_word(text, "jarvis", ["joris", "jar is"], 0.78)

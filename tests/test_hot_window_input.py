@@ -984,7 +984,9 @@ class TestEarlyBeepFeedback:
         _install_intent_judge(listener, _make_judgment(
             directed=False,  confidence="high",
             reasoning="narrative mention"))
-        _process_transcript(listener, "jarvis is a cool name", utterance_energy=0.01)
+        # A leading name is address and skips the judge (TestLeadingWakeWordFastPath),
+        # so the mention here is mid-sentence.
+        _process_transcript(listener, "i think jarvis is a cool name", utterance_energy=0.01)
         assert _accepted_query(listener) == ""
         assert not _is_beeping(listener)
         listener.state_manager.stop()
@@ -1487,7 +1489,7 @@ class TestIntentJudgeGating:
 
     @patch("builtins.print")
     def test_judge_called_when_wake_word_detected(self, _print):
-        """Utterances containing the wake word do reach the judge."""
+        """Utterances containing the wake word, other than at the start, reach the judge."""
         listener, _ = _create_listener()
 
         mock_judge = _install_intent_judge(
@@ -1495,7 +1497,7 @@ class TestIntentJudgeGating:
                 directed=True))
 
         _process_transcript(listener,
-            "jarvis what time is it", utterance_energy=0.01,
+            "what time is it jarvis", utterance_energy=0.01,
         )
 
         assert mock_judge.judge.call_count == 1
@@ -1583,3 +1585,32 @@ def test_hot_window_does_not_collect_an_earlier_tts_fragment_as_new_query(heard)
         assert _accepted_query(listener) == heard, 'The decision replaced heard speech with earlier TTS'
     finally:
         listener.state_manager.stop()
+
+
+
+# ---------------------------------------------------------------------------
+# Tests: Leading wake word skips the intent judge
+# ---------------------------------------------------------------------------
+
+@pytest.mark.unit
+class TestLeadingWakeWordFastPath:
+    """Opening with the name is direct address; the judge is only needed otherwise."""
+
+    @patch("builtins.print")
+    def test_request_opening_with_name_is_accepted_without_the_judge(self, _print):
+        listener, _ = _create_listener()
+        # A judge that would reject: acceptance shows it was not consulted.
+        _install_intent_judge(listener, _make_judgment(directed=False, confidence="high"))
+
+        _process_transcript(listener, "jarvis, is the front door light on?", utterance_energy=0.01)
+
+        assert "front door light" in _accepted_query(listener)
+
+    @patch("builtins.print")
+    def test_name_mentioned_mid_sentence_still_goes_to_the_judge(self, _print):
+        listener, _ = _create_listener()
+        _install_intent_judge(listener, _make_judgment(directed=False, confidence="high"))
+
+        _process_transcript(listener, "i asked jarvis about the weather yesterday", utterance_energy=0.01)
+
+        assert _accepted_query(listener) == ""

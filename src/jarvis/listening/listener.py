@@ -25,7 +25,7 @@ from .model_download import ModelDownloadError
 from .state_manager import StateManager, ListeningState
 from ..utils.audio_lock import portaudio_lock
 from ..utils.audio_capture import mono_capture, open_input_stream, resolve_input_device
-from .wake_detection import is_wake_word_detected, is_stop_command, is_stop_command_echo
+from .wake_detection import is_wake_word_detected, is_stop_command, is_stop_command_echo, starts_with_wake_word
 from .transcript_buffer import TranscriptBuffer
 from .intent_judge import (
     IntentJudge,
@@ -869,6 +869,18 @@ class VoiceListener(threading.Thread):
             or is_speaking_now
         )
 
+        # Opening with the name ("Jarvis, ...") is direct address: skip the
+        # judge (seconds on slower GPUs) and take the wake-word path below.
+        # While TTS is speaking the judge still runs, for stops and echo.
+        leading_wake_word = not is_speaking_now and starts_with_wake_word(
+            text_lower,
+            getattr(self.cfg, "wake_word", "jarvis"),
+            list(getattr(self.cfg, "wake_aliases", [])),
+            float(getattr(self.cfg, "wake_fuzzy_ratio", 0.78)),
+        )
+        if leading_wake_word:
+            debug_log("leading wake word: skipping intent judge", "voice")
+
         if not has_engagement_signal:
             debug_log(
                 f"skipping intent judge — no wake word, no hot window, no TTS "
@@ -878,6 +890,7 @@ class VoiceListener(threading.Thread):
 
         if (
             not skip_intent_judge_during_tts
+            and not leading_wake_word
             and has_engagement_signal
             and self._intent_judge is not None
             and self._intent_judge.available
