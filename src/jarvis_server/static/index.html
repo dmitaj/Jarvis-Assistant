@@ -110,6 +110,7 @@ $('mic').onclick = async () => {
     node.port.onmessage = (e) => { if (ws.readyState === 1) ws.send(e.data); };
     ctx.createMediaStreamSource(stream).connect(node);
     mic = { stream, ctx };
+    ws.send(JSON.stringify({ type: 'claim_mic' }));  // take the mic from an always-on panel
   }
   $('mic').setAttribute('aria-pressed', String(!!mic));
   $('mic').textContent = mic ? '🎤 Stop mic' : '🎤 Start mic';

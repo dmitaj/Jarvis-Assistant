@@ -224,6 +224,8 @@ def ws(socket) -> None:
             message = socket.receive(timeout=0.02)
             if isinstance(message, (bytes, bytearray)):
                 browser_audio.feed_microphone(bytes(message), source=client)
+            elif message and json.loads(message).get("type") == "claim_mic":
+                browser_audio.claim_microphone(client)
     except Exception as exc:
         debug_log(f"browser client disconnected: {exc}", "server")
     finally:

@@ -93,5 +93,7 @@ def test_one_browser_owns_the_mic_until_it_goes_quiet(monkeypatch):
         clock[0] += 1.5
         sd.feed_microphone(quiet, source=laptop)   # panel went quiet: laptop takes over
         sd.feed_microphone(loud, source=panel)     # now the panel waits
+        sd.claim_microphone(panel)                 # ...unless it claims the mic
+        sd.feed_microphone(loud, source=panel)
 
-    assert got == [0.5, 0.5, 0.0]
+    assert got == [0.5, 0.5, 0.0, 0.5]

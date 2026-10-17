@@ -58,6 +58,13 @@ _mic_owner_at = 0.0
 MIC_HANDOVER_SEC = 1.0
 
 
+def claim_microphone(source) -> None:
+    """Hand the mic to ``source`` now, e.g. when someone starts a test page's mic."""
+    global _mic_owner, _mic_owner_at
+    with _inputs_lock:
+        _mic_owner, _mic_owner_at = source, time.monotonic()
+
+
 def feed_microphone(pcm: bytes, source=None) -> None:
     """Deliver browser mic PCM (16 kHz mono int16) to every active input stream.
 

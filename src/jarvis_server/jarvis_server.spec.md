@@ -23,7 +23,9 @@ without PyQt.
 
 - **In:** binary WebSocket frames of 16 kHz mono int16 LE PCM. One client owns
   the mic at a time; another takes over after the owner sends nothing for 1 s
-  (closed or muted). Interleaving two clients would double the apparent rate.
+  (closed or muted), or at once when it sends `{"type": "claim_mic"}` (the
+  test page does on starting its mic). Interleaving two clients would double
+  the apparent rate.
   Input streams accept only 16 kHz mono; anything else raises a PortAudio-shaped
   format error so the listener's format negotiation lands on 16 kHz mono.
 - **Out:** each output block is broadcast as `[uint32 LE sample rate][int16 LE
