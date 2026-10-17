@@ -1,0 +1,9 @@
+.git
+.github
+website
+docs
+evals
+tests
+installer
+*.md
+!requirements.txt

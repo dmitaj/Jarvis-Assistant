@@ -26,3 +26,7 @@ src/jarvis/_version.py
 
 # Public site build output
 _site/
+
+# Jarvis server deployment
+.env
+/data/

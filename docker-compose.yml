@@ -1,0 +1,25 @@
+# Jarvis server on Unraid. Settings come from .env (copy .env.sample).
+# It gets its own LAN address on br0 so the HA-Dash portal and Ollama (both on br0)
+# can reach it directly; Unraid's macvlan blocks containers from reaching the host IP.
+services:
+  jarvis:
+    build: .
+    image: jarvis-assistant:local
+    container_name: jarvis-assistant
+    restart: unless-stopped
+    runtime: nvidia
+    networks:
+      lan:
+        ipv4_address: ${JARVIS_IP:?set JARVIS_IP in .env}
+    environment:
+      JARVIS_TOKEN: ${JARVIS_TOKEN:?set JARVIS_TOKEN in .env}
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    volumes:
+      # Config (config/jarvis/config.json), memory database, Whisper and Piper models.
+      - ${DATA_DIR:-./data}:/data
+
+networks:
+  lan:
+    external: true
+    name: ${LAN_NETWORK:-br0}

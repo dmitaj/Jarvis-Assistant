@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jarvis</title>
+<style>
+  :root { --bg: #0a0b0f; --card: #161920; --text: #f4f4f5; --muted: #a1a1aa; --accent: #f59e0b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; display: grid; gap: 12px; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 1.4rem; flex: 1; }
+  a { color: var(--accent); }
+  #state { padding: 2px 10px; border-radius: 999px; background: var(--card); color: var(--muted); }
+  #state.listening, #state.speaking { color: var(--bg); background: var(--accent); }
+  #state.thinking { color: var(--accent); }
+  button { font: inherit; padding: 8px 14px; border-radius: 8px; border: 1px solid #333; background: var(--card); color: var(--text); cursor: pointer; }
+  button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+  #log { display: grid; gap: 8px; min-height: 200px; }
+  .msg { padding: 8px 12px; border-radius: 8px; background: var(--card); white-space: pre-wrap; }
+  .msg.user { justify-self: end; background: #222633; }
+  .msg small { display: block; color: var(--muted); }
+  form { display: flex; gap: 8px; }
+  input { flex: 1; min-width: 0; font: inherit; padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: var(--card); color: var(--text); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Jarvis</h1>
+    <span id="state">connecting</span>
+    <button id="mic" aria-pressed="false">🎤 Start mic</button>
+    <a href="memory">Memory</a>
+  </header>
+  <div id="log" aria-live="polite"></div>
+  <form id="chat">
+    <input id="text" placeholder="Type to Jarvis…" autocomplete="off" aria-label="Message">
+    <button>Send</button>
+  </form>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const log = (text, who, source) => {
+  const el = document.createElement('div');
+  el.className = 'msg ' + who;
+  el.textContent = text;
+  if (source) el.insertAdjacentHTML('afterbegin', `<small>${source}</small>`);
+  $('log').append(el);
+  el.scrollIntoView({ block: 'end' });
+};
+
+// Speech audio from Jarvis: binary frames of [uint32 rate][int16 PCM].
+let player, playAt = 0;
+function play(buf) {
+  player ??= new AudioContext();
+  const rate = new DataView(buf).getUint32(0, true);
+  const pcm = new Int16Array(buf, 4);
+  if (!pcm.length) return;
+  const audio = player.createBuffer(1, pcm.length, rate);
+  const ch = audio.getChannelData(0);
+  for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+  const src = player.createBufferSource();
+  src.buffer = audio;
+  src.connect(player.destination);
+  playAt = Math.max(playAt, player.currentTime + 0.05);
+  src.start(playAt);
+  playAt += audio.duration;
+}
+
+let ws;
+function connect() {
+  ws = new WebSocket(location.origin.replace(/^http/, 'ws') + location.pathname.replace(/[^/]*$/, '') + 'ws');
+  ws.binaryType = 'arraybuffer';
+  ws.onmessage = (e) => {
+    if (typeof e.data !== 'string') return play(e.data);
+    const ev = JSON.parse(e.data);
+    if (ev.type === 'state') { $('state').textContent = ev.state; $('state').className = ev.state; }
+    if (ev.type === 'query') log(ev.text, 'user', ev.source);
+    if (ev.type === 'reply') log(ev.text ?? '(no reply)', 'jarvis', 'Jarvis');
+  };
+  ws.onclose = () => { $('state').textContent = 'offline'; $('state').className = ''; setTimeout(connect, 2000); };
+}
+connect();
+
+// Mic: 16 kHz mono int16, sent in ~40 ms chunks.
+const worklet = `registerProcessor('pcm', class extends AudioWorkletProcessor {
+  constructor() { super(); this.buf = []; }
+  process([input]) {
+    const ch = input[0];
+    if (ch) for (const s of ch) this.buf.push(Math.max(-1, Math.min(1, s)) * 32767);
+    if (this.buf.length >= 640) { this.port.postMessage(Int16Array.from(this.buf).buffer, []); this.buf = []; }
+    return true;
+  }
+});`;
+let mic;
+$('mic').onclick = async () => {
+  player ??= new AudioContext();  // unlock playback on this click
+  if (mic) {
+    mic.stream.getTracks().forEach((t) => t.stop());
+    await mic.ctx.close();
+    mic = null;
+  } else {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+    const ctx = new AudioContext({ sampleRate: 16000 });
+    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([worklet], { type: 'text/javascript' })));
+    const node = new AudioWorkletNode(ctx, 'pcm');
+    node.port.onmessage = (e) => { if (ws.readyState === 1) ws.send(e.data); };
+    ctx.createMediaStreamSource(stream).connect(node);
+    mic = { stream, ctx };
+  }
+  $('mic').setAttribute('aria-pressed', String(!!mic));
+  $('mic').textContent = mic ? '🎤 Stop mic' : '🎤 Start mic';
+};
+
+$('chat').onsubmit = async (e) => {
+  e.preventDefault();
+  const text = $('text').value.trim();
+  if (!text) return;
+  $('text').value = '';
+  const res = await fetch('api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+  if (!res.ok) log((await res.json()).error, 'jarvis', 'Error');
+};
+</script>
+</body>
+</html>
