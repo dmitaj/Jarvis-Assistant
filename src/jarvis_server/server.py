@@ -223,8 +223,7 @@ def ws(socket) -> None:
                     break
             message = socket.receive(timeout=0.02)
             if isinstance(message, (bytes, bytearray)):
-                # ponytail: every client's mic feeds one stream; fine for one wall panel.
-                browser_audio.feed_microphone(bytes(message))
+                browser_audio.feed_microphone(bytes(message), source=client)
     except Exception as exc:
         debug_log(f"browser client disconnected: {exc}", "server")
     finally:

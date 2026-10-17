@@ -53,10 +53,26 @@ def query_devices(device=None, kind=None):
     return dict(_DEVICE)
 
 
-def feed_microphone(pcm: bytes) -> None:
-    """Deliver browser mic PCM (16 kHz mono int16) to every active input stream."""
+_mic_owner = None
+_mic_owner_at = 0.0
+MIC_HANDOVER_SEC = 1.0
+
+
+def feed_microphone(pcm: bytes, source=None) -> None:
+    """Deliver browser mic PCM (16 kHz mono int16) to every active input stream.
+
+    One source owns the mic at a time; interleaving two browsers' samples would
+    double the apparent sample rate. Another source takes over once the owner
+    has sent nothing for ``MIC_HANDOVER_SEC`` (it closed its tab or muted).
+    """
+    global _mic_owner, _mic_owner_at
     if not pcm:
         return
+    now = time.monotonic()
+    with _inputs_lock:
+        if source is not _mic_owner and now - _mic_owner_at < MIC_HANDOVER_SEC:
+            return
+        _mic_owner, _mic_owner_at = source, now
     samples = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768.0
     block = samples.reshape(-1, 1)
     with _inputs_lock:

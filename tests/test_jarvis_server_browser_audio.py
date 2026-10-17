@@ -71,3 +71,27 @@ def test_output_is_sent_in_short_chunks_even_for_large_blocks(monkeypatch):
 
     chunks = [pcm for pcm in sent if pcm is not None]
     assert chunks and max(len(pcm) // 2 for pcm in chunks) <= 1000  # <= 0.1 s at 10 kHz
+
+
+def test_one_browser_owns_the_mic_until_it_goes_quiet(monkeypatch):
+    got = []
+    stream = sd.InputStream(samplerate=16000, channels=1,
+                            callback=lambda data, frames, t, s: got.append(data[0, 0]))
+    panel, laptop = object(), object()
+    clock = [1000.0]
+    monkeypatch.setattr(sd.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(sd, "_mic_owner", None)  # restored after, so other tests start clean
+    monkeypatch.setattr(sd, "_mic_owner_at", 0.0)
+    loud = np.array([16384], dtype="<i2").tobytes()
+    quiet = np.array([0], dtype="<i2").tobytes()
+
+    with stream:
+        sd.feed_microphone(loud, source=panel)
+        clock[0] += 0.5
+        sd.feed_microphone(quiet, source=laptop)   # panel still talking: dropped
+        sd.feed_microphone(loud, source=panel)
+        clock[0] += 1.5
+        sd.feed_microphone(quiet, source=laptop)   # panel went quiet: laptop takes over
+        sd.feed_microphone(loud, source=panel)     # now the panel waits
+
+    assert got == [0.5, 0.5, 0.0]
