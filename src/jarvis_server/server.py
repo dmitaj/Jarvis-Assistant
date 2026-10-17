@@ -149,6 +149,15 @@ app.view_functions["index"] = lambda: make_response(
     (STATIC_DIR / "index.html").read_text(encoding="utf-8"))
 
 
+@app.route("/overlay.js")
+def overlay_js() -> Response:
+    """The wall-panel overlay (see static/overlay.js)."""
+    response = make_response((STATIC_DIR / "overlay.js").read_text(encoding="utf-8"))
+    response.headers["Content-Type"] = "text/javascript; charset=utf-8"
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.route("/api/state")
 def get_state() -> Response:
     return jsonify({"state": face_state.get_jarvis_state().state.value})
