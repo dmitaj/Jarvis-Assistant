@@ -17,6 +17,8 @@ services:
       # 5 idle minutes; reading gemma4:26b back from the array takes ~45 s. Pin both.
       JARVIS_OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
       JARVIS_OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:--1}
+      # 1 = detailed timing/debug lines in docker logs.
+      JARVIS_VOICE_DEBUG: ${JARVIS_VOICE_DEBUG:-0}
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
     volumes:
