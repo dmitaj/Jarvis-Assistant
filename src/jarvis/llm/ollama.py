@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, List, Optional
 
 import json
+import os
 import time
 import requests
 
@@ -85,6 +86,26 @@ def _thinking_level(chat_model: str, thinking: bool | str) -> bool | str:
     return thinking
 
 
+def _pinned(payload: Dict[str, Any], *, num_ctx: bool = True) -> Dict[str, Any]:
+    """Apply deployment-wide residency settings to an Ollama request.
+
+    Ollama reloads a model whenever a request's ``num_ctx`` differs from the
+    loaded one, and unloads it after ``keep_alive``. On servers that read
+    models from slow disks a reload costs tens of seconds, so a deployment can
+    pin one context size (``JARVIS_OLLAMA_NUM_CTX``) and residency
+    (``JARVIS_OLLAMA_KEEP_ALIVE``, e.g. ``-1`` for forever) for every call.
+    Unset, requests are unchanged.
+    """
+    ctx = os.environ.get("JARVIS_OLLAMA_NUM_CTX", "").strip()
+    keep_alive = os.environ.get("JARVIS_OLLAMA_KEEP_ALIVE", "").strip()
+    if num_ctx and ctx:
+        payload.setdefault("options", {})["num_ctx"] = int(ctx)
+    if keep_alive:
+        # Ollama reads a bare number as seconds; negative means stay loaded.
+        payload["keep_alive"] = int(keep_alive) if keep_alive.lstrip("-").isdigit() else keep_alive
+    return payload
+
+
 class OllamaBackend(LLMBackend):
     """:class:`LLMBackend` implementation that talks to a local Ollama server."""
 
@@ -150,7 +171,7 @@ class OllamaBackend(LLMBackend):
 
         try:
             with http.post(
-                f"{self._base_url}/api/chat", json=payload, timeout=timeout_sec
+                f"{self._base_url}/api/chat", json=_pinned(payload), timeout=timeout_sec
             ) as resp:
                 resp.raise_for_status()
                 data = resp.json()
@@ -213,7 +234,7 @@ class OllamaBackend(LLMBackend):
         try:
             with http.post(
                 f"{self._base_url}/api/chat",
-                json=payload,
+                json=_pinned(payload),
                 timeout=timeout_sec,
                 stream=True,
             ) as resp:
@@ -300,7 +321,7 @@ class OllamaBackend(LLMBackend):
 
         try:
             with http.post(
-                f"{self._base_url}/api/chat", json=payload, timeout=timeout_sec
+                f"{self._base_url}/api/chat", json=_pinned(payload), timeout=timeout_sec
             ) as resp:
                 resp.raise_for_status()
                 data = resp.json()
@@ -345,7 +366,7 @@ class OllamaBackend(LLMBackend):
         try:
             with http.post(
                 f"{self._base_url}/api/embeddings",
-                json={"model": model, "prompt": text},
+                json=_pinned({"model": model, "prompt": text}, num_ctx=False),
                 timeout=timeout_sec,
             ) as resp:
                 resp.raise_for_status()
@@ -404,7 +425,7 @@ class OllamaBackend(LLMBackend):
             remaining = max(1.0, timeout_sec - version_to)
             with http.post(
                 f"{self._base_url}/api/chat",
-                json={
+                json=_pinned({
                     "model": model,
                     "messages": [
                         {"role": "system", "content": "You are a helpful assistant."},
@@ -413,7 +434,7 @@ class OllamaBackend(LLMBackend):
                     "stream": False,
                     "keep_alive": keep_alive,
                     "options": {"num_predict": 1, "temperature": 0.0},
-                },
+                }),
                 timeout=remaining,
             ) as resp:
                 return resp.status_code == 200
