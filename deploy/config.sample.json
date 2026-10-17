@@ -10,6 +10,10 @@
   "location_enabled": false,
   "planner_enabled": false,
   "transcript_buffer_duration_sec": 30.0,
+  "tts_piper_model_path": "/data/.local/share/jarvis/models/piper/jarvis-medium.onnx",
+  "tts_piper_length_scale": 1.0,
+  "tts_piper_noise_scale": 0.667,
+  "tts_piper_noise_w": 0.8,
   "mcps": {
     "home_assistant": {
       "command": "mcp-proxy",

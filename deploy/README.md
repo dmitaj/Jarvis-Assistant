@@ -21,6 +21,10 @@ cp .env.sample .env && sed -i "s/^JARVIS_TOKEN=.*/JARVIS_TOKEN=$(openssl rand -h
 mkdir -p data/config/jarvis && cp deploy/config.sample.json data/config/jarvis/config.json
 chmod 600 data/config/jarvis/config.json   # then put the HA long-lived token in it
 docker exec ollama ollama pull nomic-embed-text   # memory search; gemma4:26b must be there too
+# The JARVIS voice (Piper, MIT): https://huggingface.co/jgkawell/jarvis. Medium renders in ~0.4 s;
+# high sounds a little richer but takes ~2 s per reply on Tower's CPU.
+V=data/.local/share/jarvis/models/piper && mkdir -p $V && for f in jarvis-medium.onnx jarvis-medium.onnx.json; do
+  curl -fL -o $V/$f https://huggingface.co/jgkawell/jarvis/resolve/main/en/en_GB/jarvis/medium/$f; done
 ../ha-dash/bin/docker-compose up -d --build
 ```
 
