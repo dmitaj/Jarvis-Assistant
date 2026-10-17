@@ -16,6 +16,12 @@ RUN grep -viE '^(PyQt6|pyinstaller|pynput|sounddevice|chatterbox|pygame|mlx|pyte
  && pip install --no-cache-dir -r requirements-server.txt flask-sock==0.7.0 \
       nvidia-cublas-cu12==12.4.5.8 nvidia-cudnn-cu12==9.1.0.70
 
+# mcp-proxy bridges Home Assistant's MCP server to the stdio transport Jarvis speaks.
+# Own venv: it needs a newer mcp than Jarvis pins.
+RUN python -m venv /opt/mcp-proxy \
+ && /opt/mcp-proxy/bin/pip install --no-cache-dir mcp-proxy==0.12.0 \
+ && ln -s /opt/mcp-proxy/bin/mcp-proxy /usr/local/bin/mcp-proxy
+
 # CTranslate2 (faster-whisper) loads CUDA from the pip-installed NVIDIA wheels.
 ENV LD_LIBRARY_PATH=/usr/local/lib/python3.11/site-packages/nvidia/cublas/lib:/usr/local/lib/python3.11/site-packages/nvidia/cudnn/lib
 
