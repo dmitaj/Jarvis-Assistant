@@ -64,20 +64,29 @@
       this.muted = localStorage.getItem('jarvis.muted') === '1';
       this.setMuted(this.muted);
       this.connect();
+      setInterval(() => this.connect(), 3000);
       this.startMic();
     }
 
     // --- Connection --------------------------------------------------------
+    // One socket at a time. A watchdog retries whenever none is open or
+    // connecting, so a token request that never settles cannot end reconnection.
     async connect() {
+      if (this.socket && this.socket.readyState <= WebSocket.OPEN) return;
+      this.socket = null;
       try {
-        const token = await window.jarvisAccessToken?.();
+        const token = await Promise.race([
+          window.jarvisAccessToken?.(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('token timeout')), 5000)),
+        ]);
         if (token) document.cookie = `ha_dash_token=${token}; path=${base.pathname}; max-age=3600; samesite=strict; secure`;
       } catch (err) { console.warn('Jarvis: could not get an access token', err); }
-      const ws = new WebSocket(new URL('ws', base).href.replace(/^http/, 'ws'));
+      if (this.socket && this.socket.readyState <= WebSocket.OPEN) return;
+      const ws = this.socket = new WebSocket(new URL('ws', base).href.replace(/^http/, 'ws'));
       ws.binaryType = 'arraybuffer';
       ws.onopen = () => { this.ws = ws; this.updateMic(); };
       ws.onmessage = (e) => (typeof e.data === 'string' ? this.onEvent(JSON.parse(e.data)) : this.play(e.data));
-      ws.onclose = () => { this.ws = null; this.updateMic(); setTimeout(() => this.connect(), 3000); };
+      ws.onclose = () => { this.ws = null; this.updateMic(); };
     }
 
     onEvent(ev) {
