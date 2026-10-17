@@ -18,7 +18,7 @@ import sys
 import threading
 from pathlib import Path
 
-from jarvis_server import browser_audio, face_state
+from jarvis_server import browser_audio, face_state, ha_fast_path
 
 # Must happen before anything imports sounddevice or the desktop face widget.
 sys.modules["sounddevice"] = browser_audio
@@ -96,6 +96,14 @@ def _published_run_reply_engine(*args, **kwargs):
     emit("query", text=redact(text or ""), source=source)
     reply = None
     try:
+        # Simple home requests: HA's own intent matcher answers in milliseconds.
+        reply = ha_fast_path.answer(text)
+        if reply:
+            print(f"  🏠 Home Assistant answered directly: {reply}", flush=True)
+            memory = kwargs["dialogue_memory"] if "dialogue_memory" in kwargs else args[4]
+            memory.add_message("user", redact(text))
+            memory.add_message("assistant", reply)
+            return reply
         reply = _run_reply_engine(*args, **kwargs)
         return reply
     finally:

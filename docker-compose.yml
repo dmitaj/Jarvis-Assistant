@@ -13,6 +13,10 @@ services:
         ipv4_address: ${JARVIS_IP:?set JARVIS_IP in .env}
     environment:
       JARVIS_TOKEN: ${JARVIS_TOKEN:?set JARVIS_TOKEN in .env}
+      # Home Assistant fast path: HA's own intent matcher answers simple home
+      # requests before the LLM. Unset = every request goes to the LLM.
+      JARVIS_HA_URL: ${HA_URL:-}
+      JARVIS_HA_TOKEN: ${HA_TOKEN:-}
       # Ollama reloads a model whenever the context size changes and unloads it after
       # 5 idle minutes; reading gemma4:26b back from the array takes ~45 s. Pin both.
       JARVIS_OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
