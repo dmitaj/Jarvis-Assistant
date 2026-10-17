@@ -8,6 +8,8 @@
   "whisper_compute_type": "int8",
   "dictation_enabled": false,
   "location_enabled": false,
+  "planner_enabled": false,
+  "transcript_buffer_duration_sec": 30.0,
   "mcps": {
     "home_assistant": {
       "command": "mcp-proxy",
