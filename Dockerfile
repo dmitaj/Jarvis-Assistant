@@ -17,9 +17,9 @@ RUN grep -viE '^(PyQt6|pyinstaller|pynput|sounddevice|chatterbox|pygame|mlx|pyte
       nvidia-cublas-cu12==12.4.5.8 nvidia-cudnn-cu12==9.1.0.70
 
 # mcp-proxy bridges Home Assistant's MCP server to the stdio transport Jarvis speaks.
-# Own venv: it needs a newer mcp than Jarvis pins.
+# Own venv: it needs a newer mcp than Jarvis pins (and an older one than mcp 2.0).
 RUN python -m venv /opt/mcp-proxy \
- && /opt/mcp-proxy/bin/pip install --no-cache-dir mcp-proxy==0.12.0 \
+ && /opt/mcp-proxy/bin/pip install --no-cache-dir mcp-proxy==0.12.0 mcp==1.27.1 \
  && ln -s /opt/mcp-proxy/bin/mcp-proxy /usr/local/bin/mcp-proxy
 
 # CTranslate2 (faster-whisper) loads CUDA from the pip-installed NVIDIA wheels.
