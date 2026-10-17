@@ -54,3 +54,20 @@ def test_output_stream_sends_audio_in_real_time_then_ends(monkeypatch):
     played = np.frombuffer(b"".join(pcm for _, pcm in sent[:-1]), dtype="<i2")
     assert played[:3000].tolist() == audio.tolist()
     assert {rate for rate, _ in sent[:-1]} == {10000}
+
+
+def test_output_is_sent_in_short_chunks_even_for_large_blocks(monkeypatch):
+    sent = []
+    monkeypatch.setattr(sd, "audio_sink", lambda rate, pcm: sent.append(pcm))
+
+    def callback(out, frames, t, s):
+        out[:, 0] = 1
+        raise sd.CallbackStop()
+
+    stream = sd.OutputStream(samplerate=10000, channels=1, dtype="int16", blocksize=100000, callback=callback)
+    stream.start()
+    while stream.active:
+        time.sleep(0.01)
+
+    chunks = [pcm for pcm in sent if pcm is not None]
+    assert chunks and max(len(pcm) // 2 for pcm in chunks) <= 1000  # <= 0.1 s at 10 kHz

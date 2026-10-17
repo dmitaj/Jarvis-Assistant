@@ -138,7 +138,10 @@ class OutputStream(_Stream):
 
     def _pump(self) -> None:
         rate = int(self.samplerate)
-        frames = self.blocksize or max(1, rate // 20)
+        # Small chunks however large the requested block (the thinking tune asks
+        # for seconds): the browser then never queues audio far ahead, so a
+        # stopped stream goes quiet at once and speech is not stuck behind it.
+        frames = max(1, min(self.blocksize or rate // 20, rate // 10))
         dtype = np.int16 if self.dtype == "int16" else np.float32
         period = frames / rate
         next_at = time.monotonic()
