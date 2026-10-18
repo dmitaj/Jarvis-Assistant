@@ -1073,3 +1073,36 @@ class TestOpenAICompatibleSanitizesMessages:
         assert sys_msg["role"] == "system"
         assert sys_msg["content"] == "You are a helpful assistant."
         assert "_is_context_injected" not in sys_msg
+
+
+# ---------------------------------------------------------------------------
+# Output token limit field: OpenAI and Azure want max_completion_tokens
+# ---------------------------------------------------------------------------
+
+class TestOutputTokenLimitField:
+    _REPLY = {"choices": [{"message": {"role": "assistant", "content": "ok"}}]}
+
+    def _sent(self, mock_post, base_url, **options):
+        from jarvis.llm.openai_compatible import OpenAICompatibleBackend
+        mock_post.return_value = _make_response(json_data=self._REPLY)
+        OpenAICompatibleBackend(base_url, "k").chat(
+            "m", [{"role": "user", "content": "hi"}], extra_options=options)
+        return mock_post.call_args.kwargs["json"]
+
+    @pytest.mark.parametrize("base_url", [
+        "https://res.openai.azure.com/openai/v1",
+        "https://res.services.ai.azure.com/openai/v1",
+        "https://api.openai.com/v1",
+    ])
+    @patch("jarvis.llm.http.post")
+    def test_hosted_openai_endpoints_get_max_completion_tokens(self, mock_post, base_url):
+        payload = self._sent(mock_post, base_url, max_tokens=1500, temperature=0.0)
+        assert payload["max_completion_tokens"] == 1500
+        assert "max_tokens" not in payload
+        assert payload["temperature"] == 0.0
+
+    @patch("jarvis.llm.http.post")
+    def test_local_servers_keep_max_tokens(self, mock_post):
+        payload = self._sent(mock_post, "http://localhost:1234/v1", max_tokens=1500)
+        assert payload["max_tokens"] == 1500
+        assert "max_completion_tokens" not in payload

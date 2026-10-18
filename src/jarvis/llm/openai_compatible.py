@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
 import json
+from urllib.parse import urlparse
 import time
 import requests
 
@@ -111,6 +112,20 @@ class OpenAICompatibleBackend(LLMBackend):
     def base_url(self) -> str:
         return self._base_url
 
+    def _limited(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        """Name the output token cap the way the server expects.
+
+        OpenAI and Azure OpenAI reject ``max_tokens`` for current models and
+        want ``max_completion_tokens``; local servers (llama.cpp, LM Studio,
+        vLLM, ...) keep ``max_tokens``.
+        """
+        host = urlparse(self._base_url).hostname or ""
+        hosted = host == "api.openai.com" or host.endswith((".openai.azure.com", ".services.ai.azure.com"))
+        if hosted and "max_tokens" in payload:
+            payload = dict(payload)
+            payload["max_completion_tokens"] = payload.pop("max_tokens")
+        return payload
+
     def _headers(self) -> Dict[str, str]:
         headers = {"Content-Type": "application/json"}
         if self._api_key:
@@ -152,7 +167,7 @@ class OpenAICompatibleBackend(LLMBackend):
         try:
             with http.post(
                 f"{self._base_url}/chat/completions",
-                json=payload,
+                json=self._limited(payload),
                 headers=self._headers(),
                 timeout=timeout_sec,
             ) as resp:
@@ -207,7 +222,7 @@ class OpenAICompatibleBackend(LLMBackend):
         try:
             with http.post(
                 f"{self._base_url}/chat/completions",
-                json=payload,
+                json=self._limited(payload),
                 headers=self._headers(),
                 timeout=timeout_sec,
                 stream=True,
@@ -327,7 +342,7 @@ class OpenAICompatibleBackend(LLMBackend):
         try:
             with http.post(
                 f"{self._base_url}/chat/completions",
-                json=payload,
+                json=self._limited(payload),
                 headers=self._headers(),
                 timeout=timeout_sec,
             ) as resp:
@@ -461,7 +476,7 @@ class OpenAICompatibleBackend(LLMBackend):
         try:
             with http.post(
                 f"{self._base_url}/chat/completions",
-                json=payload,
+                json=self._limited(payload),
                 headers=self._headers(),
                 timeout=remaining,
             ) as resp:
