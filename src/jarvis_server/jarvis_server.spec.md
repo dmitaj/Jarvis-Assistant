@@ -30,6 +30,22 @@ text redacted). Multi-part requests (containing "and", "then" or "also") skip HA
 timeout — falls through to the reply engine unchanged. HA's replies are terse
 and not in Jarvis's persona; that is the price of answering in ~0.1 s.
 
+## Action verification
+
+HA reports success when it accepted a command, not when the device changed (a
+thermostat that is off "accepts" a new target temperature and ignores it). So:
+
+- **Fast path:** an `action_done` answer counts only once an entity HA lists
+  as a success target reports `last_updated` at or after the request (2 s clock
+  tolerance), polled for up to 3 s. Otherwise, or when HA lists no entity
+  targets, the request goes to the reply engine.
+- **Reply engine:** `run_tool_with_retries` is wrapped. After a successful
+  Home Assistant tool that is not read-only, it waits 2 s, reads HA's
+  `GetLiveContext` narrowed to the action's domain and area, and appends that
+  state with instructions: compare with the request; if the change is not
+  reflected, say what actually happened and try another tool. The model makes
+  the judgement. If the state read fails, the action result is returned as is.
+
 ## Audio
 
 - **In:** binary WebSocket frames of 16 kHz mono int16 LE PCM. One client owns

@@ -18,7 +18,7 @@ import sys
 import threading
 from pathlib import Path
 
-from jarvis_server import browser_audio, face_state, ha_fast_path
+from jarvis_server import action_check, browser_audio, face_state, ha_fast_path
 
 # Must happen before anything imports sounddevice or the desktop face widget.
 sys.modules["sounddevice"] = browser_audio
@@ -111,6 +111,9 @@ def _published_run_reply_engine(*args, **kwargs):
 
 
 reply_engine.run_reply_engine = _published_run_reply_engine
+# HA reports an accepted command as success even when the device ignored it;
+# actions now carry live state for the model to check before replying.
+reply_engine.run_tool_with_retries = action_check.wrap(reply_engine.run_tool_with_retries)
 
 
 # --- Auth -------------------------------------------------------------------

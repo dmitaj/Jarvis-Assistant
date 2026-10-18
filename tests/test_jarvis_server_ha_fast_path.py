@@ -12,20 +12,28 @@ from jarvis_server import ha_fast_path
 class _FakeHA:
     """Minimal /api/conversation/process that records requests and replies as told."""
 
-    def __init__(self, response_type="query_answer", speech="23.6 degrees", code=None):
+    def __init__(self, response_type="query_answer", speech="23.6 degrees", code=None, success=(), states=None):
         fake = self
         self.requests = []
+        self.states = states or {}  # entity_id -> last_updated (ISO)
 
         class Handler(BaseHTTPRequestHandler):
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 fake.requests.append({"path": self.path, "auth": self.headers.get("Authorization"), **body})
-                data = {"code": code} if code else {}
+                data = {"code": code} if code else {"success": list(success)}
                 payload = json.dumps({"response": {
                     "response_type": response_type, "data": data,
                     "speech": {"plain": {"speech": speech}}}}).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(payload)
+
+            def do_GET(self):
+                entity = self.path.rsplit("/", 1)[-1]
+                payload = json.dumps({"entity_id": entity, "last_updated": fake.states.get(entity, "2000-01-01T00:00:00+00:00")}).encode()
+                self.send_response(200)
                 self.end_headers()
                 self.wfile.write(payload)
 
@@ -65,9 +73,29 @@ def test_answered_question_returns_has_reply_without_the_wake_word(ha):
     assert fake.requests[0]["path"] == "/api/conversation/process"
 
 
-def test_performed_action_returns_has_reply(ha):
-    ha(response_type="action_done", speech="Turned off the lights")
+def _now():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
+def test_performed_action_returns_has_reply_once_the_device_changed(ha):
+    ha(response_type="action_done", speech="Turned off the lights",
+       success=[{"type": "entity", "id": "light.kitchen", "name": "Kitchen"}],
+       states={"light.kitchen": _now()})
     assert ha_fast_path.answer("turn off the kitchen lights") == "Turned off the lights"
+
+
+def test_action_that_changed_nothing_goes_to_the_llm(ha, monkeypatch):
+    """HA "succeeds" on a thermostat that is off; the device never updates."""
+    monkeypatch.setattr(ha_fast_path, "CHECK_SEC", 0.3)
+    ha(response_type="action_done", speech="Temperature set to 23",
+       success=[{"type": "entity", "id": "climate.family_room", "name": "Family Room"}])
+    assert ha_fast_path.answer("set the thermostat to 23") is None
+
+
+def test_action_without_entity_targets_goes_to_the_llm(ha):
+    ha(response_type="action_done", speech="Done", success=[{"type": "area", "id": "kitchen", "name": "Kitchen"}])
+    assert ha_fast_path.answer("turn off the kitchen") is None
 
 
 def test_unmatched_request_falls_back_to_the_llm(ha):

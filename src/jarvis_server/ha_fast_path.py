@@ -11,12 +11,16 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import urllib.request
+from datetime import datetime
 from typing import Optional
 
 from jarvis.debug import debug_log
 
 TIMEOUT_SEC = 4.0
+# An action counts only once a targeted entity actually updates.
+CHECK_SEC = 3.0
 _ANSWERED = {"action_done", "query_answer"}
 # "Jarvis, ..." — HA would read the name as part of the request.
 # ponytail: literal "jarvis"; a misheard alias reaches HA unstripped, fails to
@@ -35,6 +39,7 @@ def answer(text: str) -> Optional[str]:
     request_text = _LEADING_NAME.sub("", text or "").strip()
     if not url or not token or not request_text or _MULTI_PART.search(request_text):
         return None
+    started = time.time()
     req = urllib.request.Request(
         f"{url}/api/conversation/process",
         data=json.dumps({"text": request_text, "language": "en",
@@ -50,5 +55,31 @@ def answer(text: str) -> Optional[str]:
     if response.get("response_type") not in _ANSWERED:
         debug_log(f"HA fast path: no match ({response.get('data', {}).get('code')})", "server")
         return None
+    if response.get("response_type") == "action_done" and not _changed(url, token, response, started):
+        debug_log("HA fast path: action reported done but no target updated; using the LLM", "server")
+        print("  🏠 Home Assistant reported success but nothing changed; asking the model", flush=True)
+        return None
     speech = response.get("speech", {}).get("plain", {}).get("speech", "").strip()
     return speech or None
+
+
+def _changed(url: str, token: str, response: dict, started: float) -> bool:
+    """True once any entity HA says it acted on reports an update since ``started``."""
+    ids = [t["id"] for t in response.get("data", {}).get("success", []) if t.get("type") == "entity"]
+    deadline = time.time() + CHECK_SEC
+    while ids:
+        for entity_id in ids:
+            req = urllib.request.Request(f"{url}/api/states/{entity_id}",
+                                         headers={"Authorization": f"Bearer {token}"})
+            try:
+                with urllib.request.urlopen(req, timeout=TIMEOUT_SEC) as resp:
+                    updated = datetime.fromisoformat(json.load(resp)["last_updated"]).timestamp()
+            except Exception as exc:
+                debug_log(f"HA fast path: state check failed for {entity_id}: {exc}", "server")
+                return False
+            if updated >= started - 2.0:  # allow for clock skew between hosts
+                return True
+        if time.time() >= deadline:
+            return False
+        time.sleep(0.5)
+    return False
