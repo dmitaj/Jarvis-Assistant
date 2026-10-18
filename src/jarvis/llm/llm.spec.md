@@ -132,7 +132,7 @@ The migration in `_migrate_config` runs once when `_config_version < 2`:
 
 ### OpenAI-compatible (`OpenAICompatibleBackend`)
 
-- Output token cap: hosted OpenAI endpoints (`api.openai.com`, `*.openai.azure.com`, `*.services.ai.azure.com`) receive `max_completion_tokens`, since current models there reject `max_tokens`; every other server receives `max_tokens`.
+- Output token cap: hosted OpenAI endpoints (`api.openai.com`, `*.openai.azure.com`, `*.services.ai.azure.com`) receive `max_completion_tokens`, since current models there reject `max_tokens`; every other server receives `max_tokens`. Requests with tools to those hosts also set `parallel_tool_calls: false`: hosted models batch tool calls, but the reply engine executes one call per turn, and an unanswered `tool_call_id` makes the next request fail with a 400.
 
 - Endpoints: `POST /chat/completions`, `POST /embeddings`, `GET /models`.
 - Streaming: Server-Sent Events. Lines start with `data:` and an empty payload terminator is `data: [DONE]`. Comment lines (`: ping`) and malformed payloads are skipped.

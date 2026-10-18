@@ -113,17 +113,23 @@ class OpenAICompatibleBackend(LLMBackend):
         return self._base_url
 
     def _limited(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        """Name the output token cap the way the server expects.
+        """Adapt a payload to hosted OpenAI / Azure OpenAI endpoints.
 
-        OpenAI and Azure OpenAI reject ``max_tokens`` for current models and
-        want ``max_completion_tokens``; local servers (llama.cpp, LM Studio,
-        vLLM, ...) keep ``max_tokens``.
+        Those reject ``max_tokens`` for current models and want
+        ``max_completion_tokens``; local servers (llama.cpp, LM Studio, vLLM,
+        ...) keep ``max_tokens``. Hosted models also batch several tool calls
+        into one turn, which the reply engine (one tool call per turn) cannot
+        answer, so tool requests ask for one call at a time.
         """
         host = urlparse(self._base_url).hostname or ""
         hosted = host == "api.openai.com" or host.endswith((".openai.azure.com", ".services.ai.azure.com"))
-        if hosted and "max_tokens" in payload:
-            payload = dict(payload)
+        if not hosted:
+            return payload
+        payload = dict(payload)
+        if "max_tokens" in payload:
             payload["max_completion_tokens"] = payload.pop("max_tokens")
+        if payload.get("tools"):
+            payload["parallel_tool_calls"] = False
         return payload
 
     def _headers(self) -> Dict[str, str]:

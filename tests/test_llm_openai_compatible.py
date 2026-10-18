@@ -1106,3 +1106,25 @@ class TestOutputTokenLimitField:
         payload = self._sent(mock_post, "http://localhost:1234/v1", max_tokens=1500)
         assert payload["max_tokens"] == 1500
         assert "max_completion_tokens" not in payload
+
+
+class TestParallelToolCalls:
+    """The engine runs one tool call per turn, so hosted endpoints must not batch them."""
+
+    _REPLY = {"choices": [{"message": {"role": "assistant", "content": "ok"}}]}
+    _TOOLS = [{"type": "function", "function": {"name": "t", "parameters": {"type": "object"}}}]
+
+    def _sent(self, mock_post, base_url, tools):
+        from jarvis.llm.openai_compatible import OpenAICompatibleBackend
+        mock_post.return_value = _make_response(json_data=self._REPLY)
+        OpenAICompatibleBackend(base_url, "k").chat("m", [{"role": "user", "content": "hi"}], tools=tools)
+        return mock_post.call_args.kwargs["json"]
+
+    @patch("jarvis.llm.http.post")
+    def test_hosted_endpoint_with_tools_asks_for_one_call_at_a_time(self, mock_post):
+        assert self._sent(mock_post, "https://res.openai.azure.com/openai/v1", self._TOOLS)["parallel_tool_calls"] is False
+
+    @patch("jarvis.llm.http.post")
+    def test_without_tools_or_on_local_servers_the_field_is_absent(self, mock_post):
+        assert "parallel_tool_calls" not in self._sent(mock_post, "https://res.openai.azure.com/openai/v1", None)
+        assert "parallel_tool_calls" not in self._sent(mock_post, "http://localhost:1234/v1", self._TOOLS)
