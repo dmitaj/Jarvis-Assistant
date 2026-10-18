@@ -26,7 +26,7 @@ sends the request (leading "Jarvis" removed) to HA's built-in conversation agent
 (`/api/conversation/process`, `agent_id: conversation.home_assistant`). When HA
 reports `action_done` or `query_answer`, its spoken reply is the answer: the
 reply engine does not run, and both turns are added to dialogue memory (user
-text redacted). Anything else — no intent match, HA unreachable, a 4 s
+text redacted). Multi-part requests (containing "and", "then" or "also") skip HA, which would answer only one part. Anything else — no intent match, HA unreachable, a 4 s
 timeout — falls through to the reply engine unchanged. HA's replies are terse
 and not in Jarvis's persona; that is the price of answering in ~0.1 s.
 

@@ -22,6 +22,10 @@ _ANSWERED = {"action_done", "query_answer"}
 # ponytail: literal "jarvis"; a misheard alias reaches HA unstripped, fails to
 # match and falls back to the LLM. Use the configured wake words if that bites.
 _LEADING_NAME = re.compile(r"^\W*jarvis\b[\s,.:;!?]*", re.IGNORECASE)
+# HA answers only one part of a compound request ("is anyone in the nursery and
+# are its lights on?" -> "No"), so those go to the LLM, which handles every part.
+# ponytail: English joiners only; other languages fall through to HA as before.
+_MULTI_PART = re.compile(r"\b(and|then|also)\b", re.IGNORECASE)
 
 
 def answer(text: str) -> Optional[str]:
@@ -29,7 +33,7 @@ def answer(text: str) -> Optional[str]:
     url = os.environ.get("JARVIS_HA_URL", "").rstrip("/")
     token = os.environ.get("JARVIS_HA_TOKEN", "")
     request_text = _LEADING_NAME.sub("", text or "").strip()
-    if not url or not token or not request_text:
+    if not url or not token or not request_text or _MULTI_PART.search(request_text):
         return None
     req = urllib.request.Request(
         f"{url}/api/conversation/process",

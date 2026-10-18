@@ -91,3 +91,15 @@ def test_bare_wake_word_is_not_sent(ha):
     fake = ha()
     assert ha_fast_path.answer("Jarvis") is None
     assert fake.requests == []
+
+
+@pytest.mark.parametrize("text", [
+    "Jarvis, is anyone in the nursery right now and are its lights on?",
+    "turn off the kitchen lights then lock the front door",
+    "what is the temperature, also is the garage open",
+])
+def test_multi_part_requests_go_to_the_llm(ha, text):
+    """HA answers one part of a compound request; the LLM handles all of it."""
+    fake = ha(response_type="query_answer", speech="No")
+    assert ha_fast_path.answer(text) is None
+    assert fake.requests == []
