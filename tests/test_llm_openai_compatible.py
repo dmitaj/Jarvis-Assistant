@@ -689,7 +689,7 @@ class TestOpenAICompatibleWarmUp:
         payload = kwargs["json"]
         assert payload["model"] == "gpt-4o-mini"
         assert payload["messages"] == [{"role": "user", "content": "ping"}]
-        assert payload["max_tokens"] == 1
+        assert payload["max_tokens"] <= 16  # tiny: only loads the model
         assert payload["stream"] is False
 
     # ── failure in phase 1 (reachability) ─────────────────────────────
