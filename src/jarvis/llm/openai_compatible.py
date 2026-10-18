@@ -443,7 +443,7 @@ class OpenAICompatibleBackend(LLMBackend):
         the budget, max 5 s).
 
         Phase 2 (model loading): sends a single-token chat completion
-        (``max_tokens=1``) so the runtime actually loads the model into
+        (``max_tokens=16``) so the runtime actually loads the model into
         memory. Without this, an OpenAI-compatible server may leave the
         model cold until the first real request, incurring latency on the
         user's first query. This mirrors what ``OllamaBackend.warm_up()``
@@ -470,7 +470,7 @@ class OpenAICompatibleBackend(LLMBackend):
         payload = {
             "model": model,
             "messages": [{"role": "user", "content": "ping"}],
-            "max_tokens": 1,
+            "max_tokens": 16,  # some hosted models reject a cap of 1
             "stream": False,
         }
         try:
