@@ -684,6 +684,24 @@ def export_example_config(include_db_path: bool = False) -> Dict[str, Any]:
     return config
 
 
+def _env_overrides(defaults: Dict[str, Any]) -> Dict[str, Any]:
+    """``JARVIS_CFG_<KEY>`` values for known config keys, for deployments.
+
+    Values parse as JSON when they can (``false``, ``8192``), else strings.
+    Blank values are ignored, so an unset compose variable keeps the file's value.
+    """
+    overrides: Dict[str, Any] = {}
+    for key in defaults:
+        raw = os.environ.get(f"JARVIS_CFG_{key.upper()}", "").strip()
+        if not raw:
+            continue
+        try:
+            overrides[key] = json.loads(raw)
+        except ValueError:
+            overrides[key] = raw
+    return overrides
+
+
 def load_settings() -> Settings:
     # Load environment for debug toggles and optional config file path only
     load_dotenv(override=False)
@@ -706,6 +724,7 @@ def load_settings() -> Settings:
     # Get defaults and merge with JSON (JSON wins)
     defaults = get_default_config()
     merged: Dict[str, Any] = {**defaults, **cfg_json}
+    merged.update(_env_overrides(defaults))
 
     # Build Settings. Some fields support env var overrides.
     # Env overrides: JARVIS_VOICE_DEBUG, JARVIS_WHISPER_BACKEND

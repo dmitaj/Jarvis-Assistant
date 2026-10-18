@@ -12,6 +12,8 @@ Saved opaque keys and literal values survive the existing migration and desktop-
 
 ## Runtime settings
 
+**Environment overrides:** a non-blank `JARVIS_CFG_<KEY>` environment variable overrides the config key `<key>` (any key with a default), on top of the JSON file. Values parse as JSON when possible (`false`, `8192`), otherwise as strings. Overrides are never written back to the file. Deployments use them to keep secrets and per-host choices (e.g. a remote model endpoint) in their own environment.
+
 Every declared default is represented in typed runtime Settings. Saved values take precedence independently, including `llm_thinking_enabled`, `intent_judge_thinking_enabled` and `dictation_thinking_enabled`. These switches default to disabled and apply to their respective LLM contexts.
 
 `stop_commands` supplies the listener's text interruption phrases. An empty list disables text interruption phrases; intent judgement retains its stop decisions. `stop_command_fuzzy_ratio` supplies the same threshold to short-control matching and standalone-control priority during TTS echo handling. List normalisation follows the shared configuration list parser.

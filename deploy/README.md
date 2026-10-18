@@ -35,6 +35,16 @@ The first start downloads Whisper `medium` and the Piper voice into `data/`. Che
 `.env`, then rebuild it. Jarvis only sees entities exposed to Assist (HA: *Settings → Voice
 assistants → Expose*).
 
+## Remote chat model (Microsoft Foundry, optional)
+
+Fill `FOUNDRY_ENDPOINT`, `FOUNDRY_API_KEY` and `FOUNDRY_CHAT_DEPLOYMENT` in `.env` (optionally
+`FOUNDRY_FAST_DEPLOYMENT` for the intent judge and tool router), then `../ha-dash/bin/docker-compose up -d`.
+The endpoint is the resource's OpenAI v1 URL, e.g. `https://<resource>.openai.azure.com/openai/v1`.
+Compose turns them into `JARVIS_CFG_*` overrides of `config.json`. Whisper, Piper, embeddings and
+the HA fast path stay local. Requests that miss the fast path, with the HA live context and memory
+snippets Jarvis attaches, go to Foundry. Blank `FOUNDRY_ENDPOINT` and run `up -d` again to go back
+to Ollama.
+
 ## Update
 
 ```sh

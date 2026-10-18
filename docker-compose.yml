@@ -17,6 +17,15 @@ services:
       # requests before the LLM. Unset = every request goes to the LLM.
       JARVIS_HA_URL: ${HA_URL:-}
       JARVIS_HA_TOKEN: ${HA_TOKEN:-}
+      # Remote chat model (Microsoft Foundry, OpenAI-compatible v1 API). With
+      # FOUNDRY_ENDPOINT blank everything below is blank and Jarvis uses local
+      # Ollama from config.json. Embeddings (memory search) always stay local.
+      JARVIS_CFG_LLM_PROVIDER: ${FOUNDRY_ENDPOINT:+openai_compatible}
+      JARVIS_CFG_LLM_BASE_URL: ${FOUNDRY_ENDPOINT:-}
+      JARVIS_CFG_LLM_API_KEY: ${FOUNDRY_API_KEY:-}
+      JARVIS_CFG_LLM_CHAT_MODEL: ${FOUNDRY_CHAT_DEPLOYMENT:-}
+      JARVIS_CFG_FAST_MODEL: ${FOUNDRY_FAST_DEPLOYMENT:-${FOUNDRY_CHAT_DEPLOYMENT:-}}
+      JARVIS_CFG_EMBEDDING_PROVIDER: ${FOUNDRY_ENDPOINT:+ollama}
       # Ollama reloads a model whenever the context size changes and unloads it after
       # 5 idle minutes; reading gemma4:26b back from the array takes ~45 s. Pin both.
       JARVIS_OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
