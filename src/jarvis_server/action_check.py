@@ -20,14 +20,19 @@ from jarvis.debug import debug_log
 HA_PREFIX = "home_assistant__"
 LIVE_CONTEXT = HA_PREFIX + "homeassistant__GetLiveContext"
 SETTLE_SEC = 2.0
+# Cloud thermostats (Google Nest via HA's nest integration) confirm a new target
+# in ~6 s and a mode change in 30-40 s, so they get longer before the read.
+SETTLE_SEC_BY_DOMAIN = {"climate": 8.0}
 _READ_ONLY = {"homeassistant__GetLiveContext", "llm__GetDateTime", "todo__get_items", "media_player__search_media"}
 
 _CHECK_NOTE = (
     "\n\nVERIFICATION: live state about {settle:g} s after the action:\n{state}\n"
-    "Compare this with what the user asked for. If the requested change is not reflected "
-    "(for example a thermostat still off, or a value unchanged), do not say it worked: "
-    "tell the user plainly what actually happened, and use another available tool if one "
-    "can achieve the request."
+    "Compare this with what the user asked for. If it is reflected, confirm it. If it is not, "
+    "do not say it worked. Cloud-connected devices such as thermostats can take up to a minute "
+    "to report a change: if the device is in the right mode and simply has not updated yet, say "
+    "the command was sent but is not confirmed yet. If it plainly cannot have worked (for example "
+    "a target set while the device is off), say what actually happened, and use another available "
+    "tool if one can achieve the request."
 )
 
 
@@ -52,16 +57,18 @@ def wrap(run_tool):
         tool = (tool_name or "")[len(HA_PREFIX):] if (tool_name or "").startswith(HA_PREFIX) else None
         if tool is None or tool in _READ_ONLY or not getattr(result, "success", False):
             return result
+        filters = _filters(tool, tool_args or {})
+        settle = max([SETTLE_SEC] + [SETTLE_SEC_BY_DOMAIN.get(d, 0.0) for d in filters.get("domain", [])])
         try:
-            time.sleep(SETTLE_SEC)
-            state = run_tool(db, cfg, LIVE_CONTEXT, _filters(tool, tool_args or {}), *args, **kwargs)
+            time.sleep(settle)
+            state = run_tool(db, cfg, LIVE_CONTEXT, filters, *args, **kwargs)
         except Exception as exc:
             debug_log(f"action check unavailable: {exc}", "server")
             return result
         if not getattr(state, "success", False) or not state.reply_text:
             return result
         print(f"    🔎 Checked live state after {tool}", flush=True)
-        note = _CHECK_NOTE.format(settle=SETTLE_SEC, state=state.reply_text.strip())
+        note = _CHECK_NOTE.format(settle=settle, state=state.reply_text.strip())
         return replace(result, reply_text=(result.reply_text or "") + note)
 
     return checked

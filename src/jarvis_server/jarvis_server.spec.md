@@ -37,13 +37,14 @@ thermostat that is off "accepts" a new target temperature and ignores it). So:
 
 - **Fast path:** an `action_done` answer counts only once an entity HA lists
   as a success target reports `last_updated` at or after the request (2 s clock
-  tolerance), polled for up to 3 s. Otherwise, or when HA lists no entity
+  tolerance), polled for up to 3 s (10 s for `climate.*`: Google Nest confirms a new target in ~6 s). Otherwise, or when HA lists no entity
   targets, the request goes to the reply engine.
 - **Reply engine:** `run_tool_with_retries` is wrapped. After a successful
-  Home Assistant tool that is not read-only, it waits 2 s, reads HA's
+  Home Assistant tool that is not read-only, it waits 2 s (8 s for climate), reads HA's
   `GetLiveContext` narrowed to the action's domain and area, and appends that
-  state with instructions: compare with the request; if the change is not
-  reflected, say what actually happened and try another tool. The model makes
+  state with instructions: compare with the request; confirm it, say it was sent but not yet
+  confirmed (cloud devices can take up to a minute), or say what actually
+  happened and try another tool. The model makes
   the judgement. If the state read fails, the action result is returned as is.
 
 ## Audio

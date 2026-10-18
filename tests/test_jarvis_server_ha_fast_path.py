@@ -88,6 +88,7 @@ def test_performed_action_returns_has_reply_once_the_device_changed(ha):
 def test_action_that_changed_nothing_goes_to_the_llm(ha, monkeypatch):
     """HA "succeeds" on a thermostat that is off; the device never updates."""
     monkeypatch.setattr(ha_fast_path, "CHECK_SEC", 0.3)
+    monkeypatch.setattr(ha_fast_path, "CHECK_SEC_BY_DOMAIN", {})
     ha(response_type="action_done", speech="Temperature set to 23",
        success=[{"type": "entity", "id": "climate.family_room", "name": "Family Room"}])
     assert ha_fast_path.answer("set the thermostat to 23") is None

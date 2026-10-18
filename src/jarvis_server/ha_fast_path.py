@@ -19,8 +19,10 @@ from typing import Optional
 from jarvis.debug import debug_log
 
 TIMEOUT_SEC = 4.0
-# An action counts only once a targeted entity actually updates.
+# An action counts only once a targeted entity actually updates. Cloud thermostats
+# (Google Nest) take ~6 s to confirm a new target, so climate gets longer.
 CHECK_SEC = 3.0
+CHECK_SEC_BY_DOMAIN = {"climate": 10.0}
 _ANSWERED = {"action_done", "query_answer"}
 # "Jarvis, ..." — HA would read the name as part of the request.
 # ponytail: literal "jarvis"; a misheard alias reaches HA unstripped, fails to
@@ -66,7 +68,7 @@ def answer(text: str) -> Optional[str]:
 def _changed(url: str, token: str, response: dict, started: float) -> bool:
     """True once any entity HA says it acted on reports an update since ``started``."""
     ids = [t["id"] for t in response.get("data", {}).get("success", []) if t.get("type") == "entity"]
-    deadline = time.time() + CHECK_SEC
+    deadline = time.time() + max([CHECK_SEC] + [CHECK_SEC_BY_DOMAIN.get(i.split(".", 1)[0], 0.0) for i in ids])
     while ids:
         for entity_id in ids:
             req = urllib.request.Request(f"{url}/api/states/{entity_id}",
