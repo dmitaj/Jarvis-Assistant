@@ -37,8 +37,9 @@ thermostat that is off "accepts" a new target temperature and ignores it).
 
 - **Fast path:** an `action_done` answer counts only once an entity HA lists
   as a success target reports `last_updated` at or after the request (2 s clock
-  tolerance), polled for up to 3 s. Otherwise, or when HA lists no entity
-  targets, the request goes to the reply engine.
+  tolerance), polled for up to 3 s. Otherwise, or when HA lists only non-entity
+  targets, the request goes to the reply engine. An answer naming no targets at
+  all ("what time is it") touched no device and is used as is.
 - **Reply engine:** `run_tool_with_retries` is wrapped. After a successful
   Home Assistant tool that is not read-only, the entities in HA's
   `data.success` are read through HA's REST API and the tool result gains a

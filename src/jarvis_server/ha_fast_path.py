@@ -74,8 +74,15 @@ def answer(text: str) -> Optional[str]:
 
 
 def _changed(url: str, token: str, response: dict, started: float) -> bool:
-    """True once any entity HA says it acted on reports an update since ``started``."""
-    ids = [t["id"] for t in response.get("data", {}).get("success", []) if t.get("type") == "entity"]
+    """True once any entity HA says it acted on reports an update since ``started``.
+
+    An answer that names no targets at all (e.g. "what time is it") touched no
+    device, so there is nothing to verify.
+    """
+    data = response.get("data", {})
+    if not any(data.get(k) for k in ("targets", "success", "failed")):
+        return True
+    ids = [t["id"] for t in data.get("success", []) if t.get("type") == "entity"]
     deadline = time.time() + CHECK_SEC
     while ids:
         for entity_id in ids:

@@ -99,6 +99,12 @@ def test_action_without_entity_targets_goes_to_the_llm(ha):
     assert ha_fast_path.answer("turn off the kitchen") is None
 
 
+def test_answer_that_touches_no_devices_is_used_directly(ha):
+    """HA answers "what time is it" as action_done with no targets: nothing to verify."""
+    ha(response_type="action_done", speech="It is 4:15 PM")
+    assert ha_fast_path.answer("Jarvis, what time is it?") == "It is 4:15 PM"
+
+
 def test_unmatched_request_falls_back_to_the_llm(ha):
     ha(response_type="error", code="no_valid_targets", speech="Sorry, I am not aware of any device called a joke")
     assert ha_fast_path.answer("Jarvis, tell me a joke") is None
