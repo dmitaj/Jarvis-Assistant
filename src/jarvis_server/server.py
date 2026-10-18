@@ -114,6 +114,7 @@ reply_engine.run_reply_engine = _published_run_reply_engine
 # HA reports an accepted command as success even when the device ignored it;
 # actions now carry live state for the model to check before replying.
 reply_engine.run_tool_with_retries = action_check.wrap(reply_engine.run_tool_with_retries)
+reply_engine.select_tools = action_check.with_live_context(reply_engine.select_tools)
 
 
 # --- Auth -------------------------------------------------------------------

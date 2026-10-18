@@ -189,3 +189,20 @@ def wrap(run_tool):
         return replace(result, reply_text=(result.reply_text or "") + f"\n\nVERIFICATION: {verdict}\n{_INSTRUCTIONS}")
 
     return checked
+
+
+def with_live_context(select_tools):
+    """Wrap the tool router so HA's read-only live state comes with any tool choice.
+
+    House questions otherwise often get a router pick without it, and the
+    model spends a turn (~2 s) on toolSearchTool to find it. A router choice
+    of no tools (or only ``stop``) is kept as is.
+    """
+
+    def select(query, builtin_tools, mcp_tools, *args, **kwargs):
+        chosen = list(select_tools(query, builtin_tools, mcp_tools, *args, **kwargs) or [])
+        if LIVE_CONTEXT in (mcp_tools or {}) and LIVE_CONTEXT not in chosen and set(chosen) - {"stop"}:
+            chosen.append(LIVE_CONTEXT)
+        return chosen
+
+    return select

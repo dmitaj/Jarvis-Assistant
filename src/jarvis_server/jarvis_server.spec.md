@@ -54,6 +54,12 @@ thermostat that is off "accepts" a new target temperature and ignores it).
   or the REST API it reads `GetLiveContext` for the action's domain and area
   after 2 s instead.
 
+## Tool routing
+
+The reply engine's `select_tools` is wrapped: when the router chooses any tool
+other than `stop`, HA's read-only `GetLiveContext` is added, so house questions
+do not need a `toolSearchTool` turn to find it. A choice of no tools is kept.
+
 ## Thermostat policy
 
 Jarvis may change a thermostat's target temperature but not switch it on or

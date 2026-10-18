@@ -186,3 +186,19 @@ def test_keyword_calls_as_the_reply_engine_makes_them(ha):
         db=None, cfg=None, tool_name="home_assistant__light__HassLightSet",
         tool_args={"name": "Kitchen", "brightness": 50}, system_prompt="", original_prompt="", redacted_text="")
     assert "VERIFICATION: CONFIRMED" in result.reply_text
+
+
+def test_router_choices_always_include_home_assistants_live_state():
+    mcp = {action_check.LIVE_CONTEXT: object(), "home_assistant__intent__HassTurnOn": object()}
+    select = action_check.with_live_context(lambda query, builtin, mcp_tools, *a, **kw: ["getWeather", "stop"])
+    assert select("is the porch light on", {}, mcp) == ["getWeather", "stop", action_check.LIVE_CONTEXT]
+
+
+def test_router_choice_of_no_tools_is_kept():
+    mcp = {action_check.LIVE_CONTEXT: object()}
+    assert action_check.with_live_context(lambda *a, **kw: [])("tell me a joke", {}, mcp) == []
+    assert action_check.with_live_context(lambda *a, **kw: ["stop"])("tell me a joke", {}, mcp) == ["stop"]
+
+
+def test_without_home_assistant_the_router_is_unchanged():
+    assert action_check.with_live_context(lambda *a, **kw: ["getWeather"])(query="q", builtin_tools={}, mcp_tools={}) == ["getWeather"]
