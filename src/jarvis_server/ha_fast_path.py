@@ -17,12 +17,16 @@ from datetime import datetime
 from typing import Optional
 
 from jarvis.debug import debug_log
+from jarvis_server import action_check
 
 TIMEOUT_SEC = 4.0
-# An action counts only once a targeted entity actually updates. Cloud thermostats
-# (Google Nest) take ~6 s to confirm a new target, so climate gets longer.
+# An action counts only once a targeted entity actually updates.
 CHECK_SEC = 3.0
-CHECK_SEC_BY_DOMAIN = {"climate": 10.0}
+# Thermostat requests go to the model path, where action_check refuses switching
+# the thermostat on/off (HA's own matcher would act on it directly) and replies
+# report the setpoint rather than HA's terse "Thermostat is heat".
+# ponytail: English heating words plus the climate entities' names from HA.
+_THERMOSTAT_WORDS = re.compile(r"\b(thermostat|heat|heating|heater|furnace|cool|cooling|a/?c|air conditioning|hvac|temperature)\b", re.IGNORECASE)
 _ANSWERED = {"action_done", "query_answer"}
 # "Jarvis, ..." — HA would read the name as part of the request.
 # ponytail: literal "jarvis"; a misheard alias reaches HA unstripped, fails to
@@ -40,6 +44,10 @@ def answer(text: str) -> Optional[str]:
     token = os.environ.get("JARVIS_HA_TOKEN", "")
     request_text = _LEADING_NAME.sub("", text or "").strip()
     if not url or not token or not request_text or _MULTI_PART.search(request_text):
+        return None
+    if _THERMOSTAT_WORDS.search(request_text) or any(
+            name in request_text.casefold() for name in action_check.climate_names()):
+        debug_log("HA fast path: thermostat request, using the model path", "server")
         return None
     started = time.time()
     req = urllib.request.Request(
@@ -68,7 +76,7 @@ def answer(text: str) -> Optional[str]:
 def _changed(url: str, token: str, response: dict, started: float) -> bool:
     """True once any entity HA says it acted on reports an update since ``started``."""
     ids = [t["id"] for t in response.get("data", {}).get("success", []) if t.get("type") == "entity"]
-    deadline = time.time() + max([CHECK_SEC] + [CHECK_SEC_BY_DOMAIN.get(i.split(".", 1)[0], 0.0) for i in ids])
+    deadline = time.time() + CHECK_SEC
     while ids:
         for entity_id in ids:
             req = urllib.request.Request(f"{url}/api/states/{entity_id}",

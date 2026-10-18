@@ -51,6 +51,7 @@ class _FakeHA:
 @pytest.fixture
 def ha(monkeypatch):
     fakes = []
+    monkeypatch.setattr(ha_fast_path.action_check, "_climate_cache", (0.0, set()))
 
     def make(**kwargs):
         fake = _FakeHA(**kwargs)
@@ -65,10 +66,10 @@ def ha(monkeypatch):
 
 
 def test_answered_question_returns_has_reply_without_the_wake_word(ha):
-    fake = ha(response_type="query_answer", speech="23.6 degrees")
+    fake = ha(response_type="query_answer", speech="Yes, WLED-06")
 
-    assert ha_fast_path.answer("Jarvis, what is the temperature in the family room?") == "23.6 degrees"
-    assert fake.requests[0]["text"] == "what is the temperature in the family room?"
+    assert ha_fast_path.answer("Jarvis, is the front door light on?") == "Yes, WLED-06"
+    assert fake.requests[0]["text"] == "is the front door light on?"
     assert fake.requests[0]["auth"] == "Bearer secret"
     assert fake.requests[0]["path"] == "/api/conversation/process"
 
@@ -86,12 +87,11 @@ def test_performed_action_returns_has_reply_once_the_device_changed(ha):
 
 
 def test_action_that_changed_nothing_goes_to_the_llm(ha, monkeypatch):
-    """HA "succeeds" on a thermostat that is off; the device never updates."""
+    """HA can report success for a command the device ignored."""
     monkeypatch.setattr(ha_fast_path, "CHECK_SEC", 0.3)
-    monkeypatch.setattr(ha_fast_path, "CHECK_SEC_BY_DOMAIN", {})
-    ha(response_type="action_done", speech="Temperature set to 23",
-       success=[{"type": "entity", "id": "climate.family_room", "name": "Family Room"}])
-    assert ha_fast_path.answer("set the thermostat to 23") is None
+    ha(response_type="action_done", speech="Turned on the porch light",
+       success=[{"type": "entity", "id": "light.porch", "name": "Porch"}])
+    assert ha_fast_path.answer("turn on the porch light") is None
 
 
 def test_action_without_entity_targets_goes_to_the_llm(ha):
@@ -130,5 +130,19 @@ def test_bare_wake_word_is_not_sent(ha):
 def test_multi_part_requests_go_to_the_llm(ha, text):
     """HA answers one part of a compound request; the LLM handles all of it."""
     fake = ha(response_type="query_answer", speech="No")
+    assert ha_fast_path.answer(text) is None
+    assert fake.requests == []
+
+
+@pytest.mark.parametrize("text", [
+    "Jarvis, turn on the thermostat",
+    "what is the thermostat set to",
+    "set the heat to 23",
+    "turn the family room on",              # the thermostat's HA name
+])
+def test_thermostat_requests_go_to_the_model_path(ha, monkeypatch, text):
+    """HA's matcher would switch the thermostat itself; the model path enforces the policy."""
+    monkeypatch.setattr(ha_fast_path.action_check, "climate_names", lambda: {"family room", "climate.family_room"})
+    fake = ha(response_type="action_done", speech="Turned on")
     assert ha_fast_path.answer(text) is None
     assert fake.requests == []

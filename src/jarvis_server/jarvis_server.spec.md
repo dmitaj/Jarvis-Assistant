@@ -33,19 +33,34 @@ and not in Jarvis's persona; that is the price of answering in ~0.1 s.
 ## Action verification
 
 HA reports success when it accepted a command, not when the device changed (a
-thermostat that is off "accepts" a new target temperature and ignores it). So:
+thermostat that is off "accepts" a new target temperature and ignores it).
 
 - **Fast path:** an `action_done` answer counts only once an entity HA lists
   as a success target reports `last_updated` at or after the request (2 s clock
-  tolerance), polled for up to 3 s (10 s for `climate.*`: Google Nest confirms a new target in ~6 s). Otherwise, or when HA lists no entity
+  tolerance), polled for up to 3 s. Otherwise, or when HA lists no entity
   targets, the request goes to the reply engine.
 - **Reply engine:** `run_tool_with_retries` is wrapped. After a successful
-  Home Assistant tool that is not read-only, it waits 2 s (8 s for climate), reads HA's
-  `GetLiveContext` narrowed to the action's domain and area, and appends that
-  state with instructions: compare with the request; confirm it, say it was sent but not yet
-  confirmed (cloud devices can take up to a minute), or say what actually
-  happened and try another tool. The model makes
-  the judgement. If the state read fails, the action result is returned as is.
+  Home Assistant tool that is not read-only, the entities in HA's
+  `data.success` are read through HA's REST API and the tool result gains a
+  verdict for the model:
+  - `CONFIRMED`: an entity updated after the request (polled every 0.25 s for
+    up to 2 s);
+  - `NOT CONFIRMED`: none did;
+  - thermostats, without waiting (a cloud Nest confirms in seconds to a
+    minute): `THERMOSTAT IS OFF` when it is off, else `PENDING`.
+
+  The model is told to claim success only for `CONFIRMED`. Without entity IDs
+  or the REST API it reads `GetLiveContext` for the action's domain and area
+  after 2 s instead.
+
+## Thermostat policy
+
+Jarvis may change a thermostat's target temperature but not switch it on or
+off (which changes between heating and cooling). `HassTurnOn` / `HassTurnOff`
+calls whose domain is `climate` or whose name is a climate entity's name or ID
+are refused before reaching HA, with an error telling the model to leave it to
+the user. Because HA's own matcher would act directly, requests mentioning the
+thermostat (heating words or a climate entity's name) skip the fast path.
 
 ## Audio
 
